@@ -1,78 +1,50 @@
-# Databricks notebook source
-# MAGIC %md
-# MAGIC # Bronze Layer — Raw Ingestion
-# MAGIC
-# MAGIC **Medallion Architecture: Bronze → Silver → Gold**
-# MAGIC
-# MAGIC This notebook ingests the 6 raw CSV files provided for the Annie's Magic Numbers
-# MAGIC challenge into Delta tables with zero business transformation.
-# MAGIC
-# MAGIC | Source File | Bronze Table |
-# MAGIC |---|---|
-# MAGIC | BegInvFINAL12312016.csv | bronze.beg_inventory |
-# MAGIC | EndInvFINAL12312016.csv | bronze.end_inventory |
-# MAGIC | PurchasesFINAL12312016.csv | bronze.purchases |
-# MAGIC | SalesFINAL12312016.csv | bronze.sales |
-# MAGIC | InvoicePurchases12312016.csv | bronze.invoice_purchases |
-# MAGIC | 2017PurchasePricesDec.csv | bronze.purchase_prices |
-# MAGIC
-# MAGIC ---
-# MAGIC
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 0. Azure Data Lake Configuration
-
-# COMMAND ----------
-
+🔐 CELL 0 — ADLS Gen2 Authentication (Storage Account Key)
 # ============================================================
-# CELL 0 — ADLS Gen2 Authentication (Storage Account Key)
+# CELL 0 — Azure Data Lake Gen2 Authentication
 # ============================================================
+# This cell configures authentication so Databricks can access
+# the ADLS Gen2 account using a Storage Account Key.
+#
+# NOTE:
+# - This approach is acceptable for labs and prototypes.
+# - For production, Azure AD OAuth (Service Principal) is preferred.
+# - This cell MUST be executed before any abfss path is accessed.
 
 spark.conf.set(
     "fs.azure.account.key.anniedatalake123.dfs.core.windows.net",
-    "<YOUR_STORAGE_ACCOUNT_KEY>"
+    "<PASTE_STORAGE_ACCOUNT_KEY_1_HERE>"
 )
+🟦 CELL 1 — Azure Data Lake Base Paths
 # ============================================================
-# Azure Data Lake Gen2 base paths
+# CELL 1 — Azure Data Lake Gen2 Base Paths
 # ============================================================
-# Se definen los paths de forma centralizada para:
-# - Evitar hardcoding
-# - Facilitar reutilización en Silver/Gold
-# - Permitir cambios de storage sin tocar lógica
+# Centralized path definitions to:
+# - Avoid hardcoded paths
+# - Enable reuse across Bronze / Silver / Gold
+# - Allow storage account changes without code refactoring
 
-container = "annie-data"
+container_name = "annie-data"
 storage_account = "anniedatalake123"
 
-base_path = f"abfss://{container}@{storage_account}.dfs.core.windows.net/"
+base_path = f"abfss://{container_name}@{storage_account}.dfs.core.windows.net/"
 raw_path = base_path + "raw/"
 bronze_path = base_path + "bronze/"
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 1. Validate RAW Layer Files
-
-# COMMAND ----------
-
+🟦 CELL 2 — Validate RAW Zone Accessibility
 # ============================================================
-# CELL 1 — Validate presence of RAW CSV files
+# CELL 2 — Validate RAW Zone Accessibility
 # ============================================================
-# Ensures that ingestion is not executed on empty or incorrect paths.
-# This is a critical early validation step in production pipelines.
+# This step confirms:
+# - Authentication is correctly configured
+# - RAW folder is reachable
+# - CSV files are visible before ingestion
 
 dbutils.fs.ls(raw_path)
 
-# COMMAND ----------
+✔️ Expected: 6 CSV files listed
 
-# MAGIC %md
-# MAGIC ## 2. Generic CSV Reader Function
-
-# COMMAND ----------
-
+🟦 CELL 3 — Generic CSV Reader Function
 # ============================================================
-# CELL 2 — Generic CSV Reader Function
+# CELL 3 — Generic CSV Reader Function
 # ============================================================
 # Reads CSV files from the RAW layer using Spark.
 #
@@ -88,16 +60,9 @@ def read_csv(filename):
              .option("inferSchema", True)
              .csv(raw_path + filename)
     )
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 3. Load RAW CSV Files into DataFrames
-
-# COMMAND ----------
-
+🟦 CELL 4 — Load RAW CSV Files into DataFrames
 # ============================================================
-# CELL 3 — Load RAW CSV Files into DataFrames
+# CELL 4 — Load RAW CSV Files into DataFrames
 # ============================================================
 # Each CSV file is loaded into its own DataFrame.
 # This preserves lineage and simplifies debugging.
@@ -108,16 +73,9 @@ prices_df = read_csv("2017PurchasePricesDec.csv")
 begin_inventory_df = read_csv("BegInvFINAL12312016.csv")
 end_inventory_df = read_csv("EndInvFINAL12312016.csv")
 invoices_df = read_csv("InvoicePurchases12312016.csv")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 4. Data Inspection & Schema Validation
-
-# COMMAND ----------
-
+🟦 CELL 5 — Data Inspection & Schema Validation
 # ============================================================
-# CELL 4 — Data Inspection & Schema Validation
+# CELL 5 — Data Inspection & Schema Validation
 # ============================================================
 # Visual inspection ensures:
 # - Columns are correctly parsed
@@ -128,14 +86,9 @@ display(sales_df)
 display(purchases_df)
 display(prices_df)
 
-# COMMAND ----------
+📌 Important step to highlight in interviews
 
-# MAGIC %md
-# MAGIC ## 5. Bronze Delta Writer Function
-# MAGIC
-
-# COMMAND ----------
-
+🟦 CELL 6 — Bronze Delta Writer Function
 # ============================================================
 # CELL 6 — Bronze Delta Writer Function
 # ============================================================
@@ -153,14 +106,7 @@ def write_bronze(df, table_name):
           .mode("overwrite")
           .save(bronze_path + table_name)
     )
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 6. Persist DataFrames to Bronze Layer
-
-# COMMAND ----------
-
+🟦 CELL 7 — Persist DataFrames to Bronze Layer
 # ============================================================
 # CELL 7 — Persist DataFrames to the Bronze Layer
 # ============================================================
@@ -176,14 +122,7 @@ write_bronze(prices_df, "prices")
 write_bronze(begin_inventory_df, "begin_inventory")
 write_bronze(end_inventory_df, "end_inventory")
 write_bronze(invoices_df, "invoices")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 7. Validate Bronze Folder Structure
-
-# COMMAND ----------
-
+🟦 CELL 8 — Validate Bronze Folder Structure
 # ============================================================
 # CELL 8 — Validate Bronze Folder Structure
 # ============================================================
@@ -193,14 +132,7 @@ write_bronze(invoices_df, "invoices")
 # - Parquet files are present
 
 dbutils.fs.ls(bronze_path)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## 8. Validate Delta Read from Bronze
-
-# COMMAND ----------
-
+🟦 CELL 9 — Validate Delta Read from Bronze
 # ============================================================
 # CELL 9 — Validate Delta Read from Bronze
 # ============================================================
